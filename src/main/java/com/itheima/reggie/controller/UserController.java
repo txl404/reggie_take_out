@@ -8,6 +8,7 @@ import com.itheima.reggie.utils.ValidateCodeUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpSession;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @Author superli
@@ -27,6 +29,9 @@ import java.util.Map;
 public class UserController {
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
 
     /**
      * 发送手机验证码
@@ -46,7 +51,9 @@ public class UserController {
             //调用xx云提供短信服务API完成短信发送
 
             //需要将生成验证码保存在session中
-            session.setAttribute(phone,code);
+            // session.setAttribute(phone,code);
+
+            redisTemplate.opsForValue().set(phone,code,5, TimeUnit.MINUTES);
             return R.success("手机短信验证码发送成功");
         }
 
@@ -69,8 +76,9 @@ public class UserController {
         //获取验证码
         String code = map.get("code").toString();
         //从session中获取保存的验证码
-        Object code1 = session.getAttribute(phone);
+//        Object code1 = session.getAttribute(phone);
 
+        Object code1 = redisTemplate.opsForValue().get(phone);
 
         //两者一致登录成功
         if(code1!=null&&code.equals(code1)){
@@ -86,6 +94,8 @@ public class UserController {
 
             }
             session.setAttribute("user",user.getId());
+
+            redisTemplate.delete(phone);
             return R.success(user);
         }
         else {
